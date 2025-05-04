@@ -7,6 +7,9 @@ import { TopBar } from '@worldcoin/mini-apps-ui-kit-react';
 import { FaWallet, FaCopy, FaCheck, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import { Navigation } from '@/components/Navigation';
 import QRCode from 'react-qr-code'; // Library untuk QR Code
+import Image from 'next/image';  // Import Image dari next/image
+import { auth } from '@/auth';  // Pastikan path ke file auth benar
+
 
 const CopyButton = ({ address }: { address: string }) => {
   const [copied, setCopied] = useState(false);
@@ -38,7 +41,7 @@ const CopyButton = ({ address }: { address: string }) => {
 };
 
 export default function Wallet() {
-  const [userData, setUserData] = useState<{ username: string | null; address: string | null; balance: string | null }>({
+  const [userData, setUserData] = useState<{ username: string | null; address: string | null; balance: number | null }>({
     username: null,
     address: null,
     balance: null,
@@ -52,31 +55,29 @@ export default function Wallet() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
+
   useEffect(() => {
     // Fetch data from the blockchain (provider, balance, etc.)
     const fetchUserData = async () => {
       try {
-        // Ganti dengan provider yang sesuai
-        const provider = new ethers.JsonRpcProvider('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID');
-        const walletAddress = "0x37cff256e4aed256493060669a04b59d87d509d1"; // Replace this with your dynamic wallet address
-        const balance = await provider.getBalance(walletAddress);
-        const formattedBalance = ethers.formatEther(balance);
+        const sessionData = await auth();  // Mengambil data sesi
+        console.log("Session Data:", sessionData);  // Debugging untuk memastikan data yang diterima
 
-        // Set user data
+        // Menyimpan data user setelah auth berhasil
         setUserData({
-          username: 'XdogeUser', // Update this based on the logged-in user's data
-          address: walletAddress,
-          balance: formattedBalance,
+          username: sessionData?.user?.username || 'Pengguna Tanpa Nama',  // Menggunakan username dari sesi
+          address: sessionData?.user?.walletAddress || 'Alamat Dompet Tidak Tersedia',  // Menggunakan address dari sesi
+          balance: 0,  // Gantikan dengan data saldo dari blockchain atau API
         });
       } catch (error) {
-        console.error("Error fetching wallet data:", error);
+        console.error("Error fetching user data:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchUserData();
-  }, []);
+  }, []); // Hanya dijalankan sekali saat komponen pertama kali dimuat
 
   const handleSendSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +85,9 @@ export default function Wallet() {
       setSendError("Harap isi alamat penerima dan jumlah yang valid.");
       return;
     }
-    if (userData.balance !== null && Number(sendAmount) > userData.balance) {
+
+    // Cek jika saldo mencukupi
+    if (userData.balance !== null && !isNaN(Number(sendAmount)) && Number(sendAmount) > userData.balance) {
       setSendError("Saldo tidak mencukupi.");
       return;
     }
@@ -94,7 +97,7 @@ export default function Wallet() {
     setSendSuccess(null);
     console.log(`Mengirim ${sendAmount} XDOGE ke ${recipientAddress}`);
 
-    // Simulate sending with a setTimeout
+    // Simulasi pengiriman dengan setTimeout
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const success = Math.random() > 0.2;
@@ -134,11 +137,12 @@ export default function Wallet() {
 
       <Page.Main className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 p-4 pt-6 pb-24">
         <div className="w-full max-w-md flex flex-col items-center gap-6">
-          <img src="/xdoge-logo.png" alt="Xdoge Logo" className="w-20 h-20 md:w-24 md:h-24 object-contain mb-0 drop-shadow-lg" />
+          {/* Menggunakan Image dari next/image */}
+          <Image src="/xdoge-logo.png" alt="Xdoge Logo" width={80} height={80} className="mb-0 drop-shadow-lg" />
 
           <div className="text-center text-white">
             <p className="text-sm text-gray-400 uppercase tracking-wider">Saldo Anda</p>
-            <p className={`text-4xl font-bold mt-1 ${loading ? 'animate-pulse text-gray-600' : 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500'}`}>
+            <p className={`text-4xl font-bold mt-1 ${loading ? 'animate-pulse text-gray-600' : 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500'}`} >
               {formatBalance(userData.balance)}
               {!loading && <span className="text-2xl ml-1 text-gray-400 font-medium">XDOGE</span>}
             </p>
